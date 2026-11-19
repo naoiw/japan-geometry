@@ -1,6 +1,6 @@
 
 import { useCallback, useState } from 'react';
-import TerrainScene, { type PickedPoint } from './components/TerrainScene';
+import TerrainScene, { type PickedPoint, type ViewMode } from './components/TerrainScene';
 import { DEM_ZOOM, tileRange, JAPAN_BOUNDS } from './lib/terrain';
 
 const TILE_COUNT = tileRange(JAPAN_BOUNDS, DEM_ZOOM).length;
@@ -9,6 +9,7 @@ const coordinate = (value: number, positive: string, negative: string) =>
 
 export default function App() {
   const [exaggeration, setExaggeration] = useState(1);
+  const [viewRequest, setViewRequest] = useState<{ mode: ViewMode } | null>(null);
   const [progress, setProgress] = useState(0);
   const [terrainFailed, setTerrainFailed] = useState(0);
   const [ready, setReady] = useState(false);
@@ -38,6 +39,7 @@ export default function App() {
           <div className="stage-glow" aria-hidden="true" />
           <TerrainScene
             exaggeration={exaggeration}
+            viewRequest={viewRequest}
             onProgress={handleProgress}
             onReady={handleReady}
             onError={handleError}
@@ -63,11 +65,17 @@ export default function App() {
         <aside className="control-panel" aria-label="地形表示の設定">
           <div className="panel-intro">
             <span className="eyebrow">JAPAN / ELEVATION MODEL</span>
-            <h1>日本列島の地形を、<br /><em>立体で見る。</em></h1>
             <p>実際の標高タイルから生成した地形を、自由な角度で探索できます。</p>
           </div>
           <section className="panel-section">
-            <div className="section-head"><h2>標高の強調</h2><span>01 / EXAGGERATION</span></div>
+            <div className="section-head"><h2>視点操作</h2><span>01 / CAMERA</span></div>
+            <div className="view-buttons">
+              <button type="button" onClick={() => setViewRequest({ mode: 'reset' })} disabled={!ready}>視点をリセット</button>
+              <button type="button" onClick={() => setViewRequest({ mode: 'front' })} disabled={!ready}>正面視</button>
+            </div>
+          </section>
+          <section className="panel-section">
+            <div className="section-head"><h2>標高の強調</h2><span>02 / EXAGGERATION</span></div>
             <div className="slider-value"><strong>{exaggeration}<small>×</small></strong><span>高さを見やすく強調</span></div>
             <input aria-label="標高の強調倍率" type="range" min="0" max="10" step="1"
               value={exaggeration} onChange={e => setExaggeration(Number(e.currentTarget.value))} />
@@ -75,7 +83,7 @@ export default function App() {
             <p className="control-description">0×で起伏のない平面、1×で等倍表示です。クリック地点の実際の標高値は変化しません。</p>
           </section>
           <section className="panel-section point-panel">
-            <div className="section-head"><h2>地点の標高</h2><span>02 / INSPECT</span></div>
+            <div className="section-head"><h2>地点の標高</h2><span>03 / INSPECT</span></div>
             {picked ? (
               <div className="picked-info">
                 <div className="picked-height"><strong>{picked.elevation.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}</strong><span>m</span></div>
@@ -97,11 +105,12 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>JAPAN GEOMETRY</span>
+        <span className="footer-brand">JAPAN GEOMETRY</span>
         <span className="footer-credits">
           <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">標高データ：国土地理院</a>
           <span>·</span><span>RENDERED WITH THREE.JS</span>
         </span>
+        <a className="footer-github" href="https://github.com/naoiw/japan-geometry" target="_blank" rel="noopener noreferrer">GitHub</a>
       </footer>
     </div>
   );

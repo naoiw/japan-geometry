@@ -10,9 +10,11 @@ import { loadHeightTiles } from '../lib/tiles';
 import { flattenTerrainGeometry } from '../lib/terrainGeometry';
 
 export type PickedPoint = { longitude: number; latitude: number; elevation: number };
+export type ViewMode = 'reset' | 'front';
 
 type Props = {
   exaggeration: number;
+  viewRequest: { mode: ViewMode } | null;
   onProgress: (loaded: number, total: number) => void;
   onReady: (failed: number) => void;
   onError: (message: string) => void;
@@ -90,7 +92,7 @@ function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {
 }
 
 export default function TerrainScene({
-  exaggeration, onProgress, onReady, onError, onPick,
+  exaggeration, viewRequest, onProgress, onReady, onError, onPick,
 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const canvasState = useRef<{
@@ -137,6 +139,8 @@ export default function TerrainScene({
     controls.maxPolarAngle = Math.PI * 0.49;
     controls.target.set(0, 0, 0);
     camera.position.set(8, 22, 29);
+    controls.update();
+    controls.saveState();
 
     const light = new THREE.DirectionalLight('#fff2dc', 2.45);
     light.position.set(-9, 17, -12);
@@ -267,6 +271,20 @@ export default function TerrainScene({
     }
   }, [exaggeration, terrainReady]);
 
+  useEffect(() => {
+    const state = canvasState.current;
+    if (!state || !viewRequest) return;
+
+    if (viewRequest.mode === 'reset') {
+      // OrbitControls saves the initial perspective and target on mount.
+      state.controls.reset();
+    } else {
+      // The south edge is +Z; look north across the terrain at a shallow angle.
+      state.controls.target.set(0, 0, 0);
+      state.camera.position.set(0, 4.5, 39);
+      state.controls.update();
+    }
+  }, [viewRequest]);
 
   return <div ref={mount} className="terrain-canvas" aria-label="ドラッグして回転、ホイールやピンチで拡大縮小する日本列島の3D地形" role="img" />;
 }
