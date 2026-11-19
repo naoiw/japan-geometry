@@ -1,35 +1,18 @@
 
 import { useCallback, useState } from 'react';
-import TerrainScene, { type PickedPoint, type Region } from './components/TerrainScene';
+import TerrainScene, { type PickedPoint } from './components/TerrainScene';
 import { DEM_ZOOM, tileRange, JAPAN_BOUNDS } from './lib/terrain';
-import type { MapLayer } from './lib/tiles';
 
 const TILE_COUNT = tileRange(JAPAN_BOUNDS, DEM_ZOOM).length;
-const REGIONS: { id: Region; label: string }[] = [
-  { id: 'all', label: '日本全域' },
-  { id: 'honshu', label: '本州' },
-  { id: 'fuji', label: '富士山周辺' },
-  { id: 'hokkaido', label: '北海道' },
-  { id: 'kyushu', label: '九州' },
-  { id: 'okinawa', label: '沖縄' },
-];
-const LAYERS: { id: MapLayer; label: string; desc: string }[] = [
-  { id: 'elevation', label: '標高カラー', desc: '高さを色分け' },
-  { id: 'gsi', label: '地理院地図', desc: '地名・道路など' },
-  { id: 'osm', label: 'OpenStreetMap', desc: 'OSMの地図画像' },
-];
 const coordinate = (value: number, positive: string, negative: string) =>
   Math.abs(value).toFixed(4) + '° ' + (value >= 0 ? positive : negative);
 
 export default function App() {
-  const [layer, setLayer] = useState<MapLayer>('elevation');
   const [exaggeration, setExaggeration] = useState(12);
-  const [region, setRegion] = useState<Region>('all');
   const [progress, setProgress] = useState(0);
   const [terrainFailed, setTerrainFailed] = useState(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [picked, setPicked] = useState<PickedPoint | null>(null);
   const handleProgress = useCallback((loaded: number) => setProgress(loaded), []);
   const handleReady = useCallback((failed: number) => {
@@ -38,7 +21,6 @@ export default function App() {
     setError(null);
   }, []);
   const handleError = useCallback((message: string) => setError(message), []);
-  const handleNotice = useCallback((message: string | null) => setNotice(message), []);
   const handlePick = useCallback((point: PickedPoint) => setPicked(point), []);
 
   return (
@@ -56,12 +38,9 @@ export default function App() {
           <div className="stage-glow" aria-hidden="true" />
           <TerrainScene
             exaggeration={exaggeration}
-            layer={layer}
-            region={region}
             onProgress={handleProgress}
             onReady={handleReady}
             onError={handleError}
-            onNotice={handleNotice}
             onPick={handlePick}
           />
           <div className="scene-label" aria-hidden="true">
@@ -88,44 +67,15 @@ export default function App() {
             <p>実際の標高タイルから生成した地形を、自由な角度で探索できます。</p>
           </div>
           <section className="panel-section">
-            <div className="section-head"><h2>表示レイヤー</h2><span>01 / MAP LAYER</span></div>
-            <div className="layer-list">
-              {LAYERS.map(option => (
-                <button
-                  type="button"
-                  key={option.id}
-                  className={'layer-option ' + (layer === option.id ? 'selected' : '')}
-                  aria-pressed={layer === option.id}
-                  onClick={() => setLayer(option.id)}
-                  disabled={!ready}
-                >
-                  <span className="radio-circle" />
-                  <span><strong>{option.label}</strong><small>{option.desc}</small></span>
-                </button>
-              ))}
-            </div>
-            {notice && <p className="notice" role="status">{notice}</p>}
-          </section>
-          <section className="panel-section">
-            <div className="section-head"><h2>標高の強調</h2><span>02 / EXAGGERATION</span></div>
+            <div className="section-head"><h2>標高の強調</h2><span>01 / EXAGGERATION</span></div>
             <div className="slider-value"><strong>{exaggeration}<small>×</small></strong><span>高さを見やすく強調</span></div>
             <input aria-label="標高の強調倍率" type="range" min="1" max="25" step="1"
               value={exaggeration} onChange={e => setExaggeration(Number(e.currentTarget.value))} />
             <div className="range-labels"><span>1×</span><span>25×</span></div>
             <p className="control-description">平面距離に対する高さの表示倍率です。取得した標高の値そのものは変化しません。</p>
           </section>
-          <section className="panel-section">
-            <div className="section-head"><h2>エリア移動</h2><span>03 / LOCATION</span></div>
-            <div className="region-grid">
-              {REGIONS.map(option => (
-                <button key={option.id} type="button" onClick={() => setRegion(option.id)}
-                  className={'region-button ' + (region === option.id ? 'selected' : '')}
-                  aria-pressed={region === option.id}>{option.label}</button>
-              ))}
-            </div>
-          </section>
           <section className="panel-section point-panel">
-            <div className="section-head"><h2>地点の標高</h2><span>04 / INSPECT</span></div>
+            <div className="section-head"><h2>地点の標高</h2><span>02 / INSPECT</span></div>
             {picked ? (
               <div className="picked-info">
                 <div className="picked-height"><strong>{picked.elevation.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}</strong><span>m</span></div>
@@ -149,9 +99,7 @@ export default function App() {
       <footer className="footer">
         <span>JAPAN GEOMETRY</span>
         <span className="footer-credits">
-          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">標高・地図：国土地理院</a>
-          <span>·</span>
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">標高データ：国土地理院</a>
           <span>·</span><span>RENDERED WITH THREE.JS</span>
         </span>
       </footer>

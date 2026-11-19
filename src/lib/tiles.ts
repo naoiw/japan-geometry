@@ -1,11 +1,10 @@
 
 import {
   JAPAN_BOUNDS, tileRange, tileKey, type HeightTiles, type TileCoord,
-  type TilePixels, type Bounds,
+  type TilePixels,
 } from './terrain';
 
 const GSI_URL = 'https://cyberjapandata.gsi.go.jp/xyz/';
-const OSM_URL = 'https://tile.openstreetmap.org/';
 
 function imageFromUrl(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -59,7 +58,7 @@ export async function loadHeightTiles(
   const tiles: HeightTiles = new Map();
   let loaded = 0;
   let errors = 0;
-  await concurrent(coords, 7, async (coord) => {
+  await concurrent(coords, 6, async (coord) => {
     if (signal.aborted) return;
     try {
       const image = await imageFromUrl(demUrl(coord));
@@ -76,47 +75,3 @@ export async function loadHeightTiles(
   return { tiles, errors };
 }
 
-export type MapLayer = 'elevation' | 'osm' | 'gsi';
-
-function mapTileUrl(coord: TileCoord, layer: Exclude<MapLayer, 'elevation'>): string {
-  const stem = coord.z + '/' + coord.x + '/' + coord.y + '.png';
-  return layer === 'osm' ? OSM_URL + stem : GSI_URL + 'std/' + stem;
-}
-
-export async function loadMapCanvas(
-  layer: Exclude<MapLayer, 'elevation'>,
-  zoom: number,
-  bounds: Bounds = JAPAN_BOUNDS,
-): Promise<{ canvas: HTMLCanvasElement; missing: number }> {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2Dが利用できません');
-  ctx.fillStyle = '#142839';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const coords = tileRange(bounds, zoom);
-  const xStart = ((bounds.west + 180) / 360) * 2 ** zoom;
-  const xEnd = ((bounds.east + 180) / 360) * 2 ** zoom;
-  const northernRad = bounds.north * Math.PI / 180;
-  const southernRad = bounds.south * Math.PI / 180;
-  const yStart = (1 - Math.asinh(Math.tan(northernRad)) / Math.PI) / 2 * 2 ** zoom;
-  const yEnd = (1 - Math.asinh(Math.tan(southernRad)) / Math.PI) / 2 * 2 ** zoom;
-
-  // Draw asynchronously loaded tiles in a fixed tile order: no canvas race on overlap.
-  const results = await Promise.all(coords.map(async (coord) => {
-    try { return await imageFromUrl(mapTileUrl(coord, layer)); } catch { return null; }
-  }));
-  let missing = 0;
-  results.forEach((image, i) => {
-    if (!image) { missing++; return; }
-    const coord = coords[i];
-    const px = (coord.x - xStart) / (xEnd - xStart) * canvas.width;
-    const py = (coord.y - yStart) / (yEnd - yStart) * canvas.height;
-    const w = canvas.width / (xEnd - xStart);
-    const h = canvas.height / (yEnd - yStart);
-    ctx.drawImage(image, px, py, w, h);
-  });
-  if (missing === coords.length) throw new Error('地図画像を取得できません');
-  return { canvas, missing };
-}
