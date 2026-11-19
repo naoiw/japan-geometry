@@ -7,6 +7,7 @@ import {
   normalizedToLonLat, terrainSize, type HeightTiles,
 } from '../lib/terrain';
 import { loadHeightTiles } from '../lib/tiles';
+import { flattenTerrainGeometry } from '../lib/terrainGeometry';
 
 export type PickedPoint = { longitude: number; latitude: number; elevation: number };
 
@@ -101,6 +102,8 @@ export default function TerrainScene({
     elevationMaterial: THREE.MeshStandardMaterial;
   } | null>(null);
   const tilesRef = useRef<HeightTiles | null>(null);
+  const originalGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const flatGeometryRef = useRef<THREE.BufferGeometry | null>(null);
   const [terrainReady, setTerrainReady] = useState(false);
   const latestHandlers = useRef({ onProgress, onReady, onError, onPick });
   latestHandlers.current = { onProgress, onReady, onError, onPick };
@@ -205,7 +208,10 @@ export default function TerrainScene({
       .then(({ tiles, errors }) => {
         if (controller.signal.aborted) return;
         tilesRef.current = tiles;
-        const mesh = new THREE.Mesh(buildGeometry(tiles), elevationMaterial);
+        const geometry = buildGeometry(tiles);
+        originalGeometryRef.current = geometry;
+        const mesh = new THREE.Mesh(geometry, elevationMaterial);
+        // The initial value is 1x. Later changes are applied in the effect below.
         mesh.scale.y = exaggeration;
         scene.add(mesh);
         if (canvasState.current) canvasState.current.mesh = mesh;
@@ -224,7 +230,10 @@ export default function TerrainScene({
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
       controls.dispose();
       const mesh = canvasState.current?.mesh;
-      mesh?.geometry.dispose();
+      originalGeometryRef.current?.dispose();
+      flatGeometryRef.current?.dispose();
+      originalGeometryRef.current = null;
+      flatGeometryRef.current = null;
       elevationMaterial.dispose();
       ocean.geometry.dispose();
       oceanMaterial.dispose();
@@ -241,7 +250,21 @@ export default function TerrainScene({
 
   useEffect(() => {
     const mesh = canvasState.current?.mesh;
-    if (mesh) mesh.scale.y = exaggeration;
+    const original = originalGeometryRef.current;
+    if (!mesh || !original) return;
+
+    if (exaggeration === 0) {
+      // scale.y = 0 makes the object matrix non-invertible and breaks raycasting.
+      // Use a genuinely flat geometry instead, preserving UVs for point inspection.
+      if (!flatGeometryRef.current) {
+        flatGeometryRef.current = flattenTerrainGeometry(original);
+      }
+      mesh.geometry = flatGeometryRef.current;
+      mesh.scale.y = 1;
+    } else {
+      mesh.geometry = original;
+      mesh.scale.y = exaggeration;
+    }
   }, [exaggeration, terrainReady]);
 
 

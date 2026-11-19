@@ -8,7 +8,7 @@ const coordinate = (value: number, positive: string, negative: string) =>
   Math.abs(value).toFixed(4) + '° ' + (value >= 0 ? positive : negative);
 
 export default function App() {
-  const [exaggeration, setExaggeration] = useState(12);
+  const [exaggeration, setExaggeration] = useState(1);
   const [progress, setProgress] = useState(0);
   const [terrainFailed, setTerrainFailed] = useState(0);
   const [ready, setReady] = useState(false);
@@ -69,10 +69,10 @@ export default function App() {
           <section className="panel-section">
             <div className="section-head"><h2>標高の強調</h2><span>01 / EXAGGERATION</span></div>
             <div className="slider-value"><strong>{exaggeration}<small>×</small></strong><span>高さを見やすく強調</span></div>
-            <input aria-label="標高の強調倍率" type="range" min="1" max="25" step="1"
+            <input aria-label="標高の強調倍率" type="range" min="0" max="10" step="1"
               value={exaggeration} onChange={e => setExaggeration(Number(e.currentTarget.value))} />
-            <div className="range-labels"><span>1×</span><span>25×</span></div>
-            <p className="control-description">平面距離に対する高さの表示倍率です。取得した標高の値そのものは変化しません。</p>
+            <div className="range-labels"><span>0× (フラット)</span><span>10×</span></div>
+            <p className="control-description">0×で起伏のない平面、1×で等倍表示です。クリック地点の実際の標高値は変化しません。</p>
           </section>
           <section className="panel-section point-panel">
             <div className="section-head"><h2>地点の標高</h2><span>02 / INSPECT</span></div>
