@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  decodeElevation, getElevation, JAPAN_BOUNDS, DEM_ZOOM, MAP_ZOOM, MESH_SEGMENTS, lonLatToTile,
+  decodeElevation, getElevation, JAPAN_BOUNDS, DEM_ZOOM, MESH_SEGMENTS, lonLatToTile,
   lonLatToNormalized, normalizedToLonLat, tileRange, tileKey, tileToLonLat,
   terrainSize, type HeightTiles,
 } from '../src/lib/terrain.ts';
@@ -24,12 +24,10 @@ test('Web Mercator conversion round-trips coordinates', () => {
 
 test('Higher XY resolution is configured consistently across mesh and tiles', () => {
   assert.equal(DEM_ZOOM, 7);
-  assert.equal(MAP_ZOOM, 6);
   assert.equal(MESH_SEGMENTS, 320);
   const terrainTiles = tileRange(JAPAN_BOUNDS, DEM_ZOOM);
   assert.equal(terrainTiles.length, 144);
   assert.ok(terrainTiles.some(tile => tile.x === 108 && tile.y === 50));
-  assert.equal(tileRange(JAPAN_BOUNDS, MAP_ZOOM).length, 49);
   assert.equal((MESH_SEGMENTS + 1) ** 2, 103041);
   const size = terrainSize();
   assert.ok(size.depth > 0 && size.width === 20);
