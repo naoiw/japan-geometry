@@ -10,7 +10,7 @@ import { loadHeightTiles } from '../lib/tiles';
 import { flattenTerrainGeometry } from '../lib/terrainGeometry';
 
 export type PickedPoint = { longitude: number; latitude: number; elevation: number };
-export type ViewMode = 'reset' | 'front';
+export type ViewMode = 'reset' | 'top';
 
 type Props = {
   exaggeration: number;
@@ -135,7 +135,7 @@ export default function TerrainScene({
     controls.enablePan = true;
     controls.minDistance = 4;
     controls.maxDistance = 85;
-    controls.minPolarAngle = 0.17;
+    controls.minPolarAngle = 0; // Allow a true overhead view.
     controls.maxPolarAngle = Math.PI * 0.49;
     controls.target.set(0, 0, 0);
     camera.position.set(8, 22, 29);
@@ -275,13 +275,13 @@ export default function TerrainScene({
     const state = canvasState.current;
     if (!state || !viewRequest) return;
 
-    if (viewRequest.mode === 'reset') {
-      // OrbitControls saves the initial perspective and target on mount.
-      state.controls.reset();
-    } else {
-      // The south edge is +Z; look north across the terrain at a shallow angle.
-      state.controls.target.set(0, 0, 0);
-      state.camera.position.set(0, 4.5, 39);
+    // Clear any pending damped rotation/pan before moving the camera.
+    // reset() restores the original saved perspective and target.
+    state.controls.reset();
+    if (viewRequest.mode === 'top') {
+      // Look straight down with north (-Z) at the top of the screen.
+      // A tiny +Z offset avoids a degenerate up vector at exact zenith.
+      state.camera.position.set(0, 39, 0.001);
       state.controls.update();
     }
   }, [viewRequest]);

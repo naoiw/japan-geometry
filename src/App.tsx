@@ -71,7 +71,7 @@ export default function App() {
             <div className="section-head"><h2>視点操作</h2><span>01 / CAMERA</span></div>
             <div className="view-buttons">
               <button type="button" onClick={() => setViewRequest({ mode: 'reset' })} disabled={!ready}>視点をリセット</button>
-              <button type="button" onClick={() => setViewRequest({ mode: 'front' })} disabled={!ready}>正面視</button>
+              <button type="button" onClick={() => setViewRequest({ mode: 'top' })} disabled={!ready}>上面視</button>
             </div>
           </section>
           <section className="panel-section">
@@ -105,12 +105,14 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span className="footer-brand">JAPAN GEOMETRY</span>
-        <span className="footer-credits">
-          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">標高データ：国土地理院</a>
-          <span>·</span><span>RENDERED WITH THREE.JS</span>
+        <span className="footer-copyright">© 2026 naoiw</span>
+        <span className="footer-links">
+          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">標高データ：国土地理院 ↗</a>
+          <span className="footer-separator" aria-hidden="true">·</span>
+          <span>3D: THREE.JS</span>
+          <span className="footer-separator" aria-hidden="true">·</span>
+          <a href="https://github.com/naoiw/japan-geometry" target="_blank" rel="noopener noreferrer" aria-label="GitHubでソースコードを開く">GitHub ↗</a>
         </span>
-        <a className="footer-github" href="https://github.com/naoiw/japan-geometry" target="_blank" rel="noopener noreferrer">GitHub</a>
       </footer>
     </div>
   );
