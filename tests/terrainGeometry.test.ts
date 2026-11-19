@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { flattenTerrainGeometry } from '../src/lib/terrainGeometry.ts';
+import { flattenTerrainGeometry, shouldDrawTerrainTriangle } from '../src/lib/terrainGeometry.ts';
+
+test('shoreline land triangles remain connected across no-data sea vertices', () => {
+  assert.equal(shouldDrawTerrainTriangle(2, 1, 1), true);
+  assert.equal(shouldDrawTerrainTriangle(1, 2, 1), true);
+  assert.equal(shouldDrawTerrainTriangle(2, 2, 1), true);
+  assert.equal(shouldDrawTerrainTriangle(1, 1, 1), false);
+  assert.equal(shouldDrawTerrainTriangle(2, 0, 2), false);
+  assert.equal(shouldDrawTerrainTriangle(0, 1, 1), false);
+});
 
 test('0x is perfectly flat without changing original elevation or UV values', () => {
   const original = new THREE.BufferGeometry();

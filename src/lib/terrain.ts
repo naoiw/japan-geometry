@@ -3,7 +3,7 @@
 export const JAPAN_BOUNDS = { west: 122, east: 154, north: 47, south: 20 } as const;
 export const DEM_ZOOM = 7;
 /** Horizontal mesh subdivision count; shared by both dimensions. */
-export const MESH_SEGMENTS = 320;
+export const MESH_SEGMENTS = 640;
 export const MODEL_WIDTH = 20;
 export const HEIGHT_UNITS_PER_METRE = 0.00006;
 
@@ -11,6 +11,7 @@ export type Bounds = { west: number; east: number; north: number; south: number 
 export type TileCoord = { z: number; x: number; y: number };
 export type TilePixels = { width: number; height: number; rgba: Uint8ClampedArray };
 export type HeightTiles = Map<string, TilePixels>;
+export type ElevationSample = { elevation: number | null; tileAvailable: boolean };
 
 export function lonLatToTile(lon: number, lat: number, zoom: number) {
   const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
@@ -52,16 +53,30 @@ export function decodeElevation(r: number, g: number, b: number): number | null 
   return (value < 0x800000 ? value : value - 0x1000000) / 100;
 }
 
-export function getElevation(tiles: HeightTiles, lon: number, lat: number, zoom = DEM_ZOOM): number | null {
+/**
+ * Distinguish a downloaded tile containing a no-data pixel (usually ocean)
+ * from a tile that failed to load. Both lack a measurable elevation, but only
+ * the former can be used as a sea-level shoreline vertex in the mesh.
+ */
+export function sampleElevation(
+  tiles: HeightTiles, lon: number, lat: number, zoom = DEM_ZOOM,
+): ElevationSample {
   const fractional = lonLatToTile(lon, lat, zoom);
   const x = Math.floor(fractional.x);
   const y = Math.floor(fractional.y);
   const tile = tiles.get(tileKey(zoom, x, y));
-  if (!tile) return null;
+  if (!tile) return { elevation: null, tileAvailable: false };
   const pixelX = Math.min(tile.width - 1, Math.max(0, Math.floor((fractional.x - x) * tile.width)));
   const pixelY = Math.min(tile.height - 1, Math.max(0, Math.floor((fractional.y - y) * tile.height)));
   const index = (pixelY * tile.width + pixelX) * 4;
-  return decodeElevation(tile.rgba[index], tile.rgba[index + 1], tile.rgba[index + 2]);
+  return {
+    elevation: decodeElevation(tile.rgba[index], tile.rgba[index + 1], tile.rgba[index + 2]),
+    tileAvailable: true,
+  };
+}
+
+export function getElevation(tiles: HeightTiles, lon: number, lat: number, zoom = DEM_ZOOM): number | null {
+  return sampleElevation(tiles, lon, lat, zoom).elevation;
 }
 
 export function terrainSize(bounds: Bounds = JAPAN_BOUNDS) {

@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  DEM_ZOOM, MESH_SEGMENTS, HEIGHT_UNITS_PER_METRE, getElevation,
+  DEM_ZOOM, MESH_SEGMENTS, HEIGHT_UNITS_PER_METRE, getElevation, sampleElevation,
   normalizedToLonLat, terrainSize, type HeightTiles,
 } from '../lib/terrain';
 import { loadHeightTiles } from '../lib/tiles';
-import { flattenTerrainGeometry } from '../lib/terrainGeometry';
+import { flattenTerrainGeometry, shouldDrawTerrainTriangle } from '../lib/terrainGeometry';
 
 export type PickedPoint = { longitude: number; latitude: number; elevation: number };
 export type ViewMode = 'reset' | 'top';
@@ -50,10 +50,12 @@ function colorForElevation(elevation: number | null): THREE.Color {
 
 function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {
   const size = terrainSize();
-  const points: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
-  const valid: boolean[] = [];
+  const vertexCount = (ROW_COUNT + 1) * (COLUMN_COUNT + 1);
+  const points = new Float32Array(vertexCount * 3);
+  const colors = new Float32Array(vertexCount * 3);
+  const uvs = new Float32Array(vertexCount * 2);
+  // 0 = missing tile, 1 = water / no-data pixel, 2 = land.
+  const vertexKind = new Uint8Array(vertexCount);
   const indices: number[] = [];
 
   for (let row = 0; row <= ROW_COUNT; row++) {
@@ -61,12 +63,23 @@ function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {
     for (let column = 0; column <= COLUMN_COUNT; column++) {
       const u = column / COLUMN_COUNT;
       const location = normalizedToLonLat(u, v);
-      const elevation = getElevation(tiles, location.lon, location.lat);
-      const color = colorForElevation(elevation);
-      points.push((u - 0.5) * size.width, elevation === null ? 0 : Math.max(0, elevation) * HEIGHT_UNITS_PER_METRE, (v - 0.5) * size.depth);
-      colors.push(color.r, color.g, color.b);
-      uvs.push(u, 1 - v);
-      valid.push(elevation !== null);
+      const { elevation, tileAvailable } = sampleElevation(tiles, location.lon, location.lat);
+      // A no-data pixel in a successfully loaded DEM tile is usually ocean:
+      // let the land reach the sea-level vertex without inventing its height.
+      // Missing tiles stay excluded so network failures cannot create terrain.
+      const color = tileAvailable ? (elevation === null ? OCEAN_COLOR : colorForElevation(elevation)) : MISSING_COLOR;
+      const vertex = row * (COLUMN_COUNT + 1) + column;
+      const xyz = vertex * 3;
+      const uv = vertex * 2;
+      points[xyz] = (u - 0.5) * size.width;
+      points[xyz + 1] = elevation === null ? 0 : Math.max(0, elevation) * HEIGHT_UNITS_PER_METRE;
+      points[xyz + 2] = (v - 0.5) * size.depth;
+      colors[xyz] = color.r;
+      colors[xyz + 1] = color.g;
+      colors[xyz + 2] = color.b;
+      uvs[uv] = u;
+      uvs[uv + 1] = 1 - v;
+      vertexKind[vertex] = !tileAvailable ? 0 : elevation !== null && elevation > 0 ? 2 : 1;
     }
   }
   const stride = COLUMN_COUNT + 1;
@@ -77,15 +90,15 @@ function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {
       const c = a + stride;
       const d = c + 1;
       // +Y winding: the world-map north edge is at negative Z.
-      if (valid[a] && valid[c] && valid[b]) indices.push(a, c, b);
-      if (valid[b] && valid[c] && valid[d]) indices.push(b, c, d);
+      if (shouldDrawTerrainTriangle(vertexKind[a], vertexKind[c], vertexKind[b])) indices.push(a, c, b);
+      if (shouldDrawTerrainTriangle(vertexKind[b], vertexKind[c], vertexKind[d])) indices.push(b, c, d);
     }
   }
 
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('position', new THREE.BufferAttribute(points, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;

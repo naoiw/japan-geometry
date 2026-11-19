@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  decodeElevation, getElevation, JAPAN_BOUNDS, DEM_ZOOM, MESH_SEGMENTS, lonLatToTile,
+  decodeElevation, getElevation, sampleElevation, JAPAN_BOUNDS, DEM_ZOOM, MESH_SEGMENTS, lonLatToTile,
   lonLatToNormalized, normalizedToLonLat, tileRange, tileKey, tileToLonLat,
   terrainSize, type HeightTiles,
 } from '../src/lib/terrain.ts';
@@ -24,11 +24,11 @@ test('Web Mercator conversion round-trips coordinates', () => {
 
 test('Higher XY resolution is configured consistently across mesh and tiles', () => {
   assert.equal(DEM_ZOOM, 7);
-  assert.equal(MESH_SEGMENTS, 320);
+  assert.equal(MESH_SEGMENTS, 640);
   const terrainTiles = tileRange(JAPAN_BOUNDS, DEM_ZOOM);
   assert.equal(terrainTiles.length, 144);
   assert.ok(terrainTiles.some(tile => tile.x === 108 && tile.y === 50));
-  assert.equal((MESH_SEGMENTS + 1) ** 2, 103041);
+  assert.equal((MESH_SEGMENTS + 1) ** 2, 410881);
   const size = terrainSize();
   assert.ok(size.depth > 0 && size.width === 20);
 });
@@ -57,5 +57,12 @@ test('elevation sample reads the corresponding pixel without invented fallbacks'
   rgba[offset + 2] = 16;
   const tiles: HeightTiles = new Map([[tileKey(6, x, y), { width: 256, height: 256, rgba }]]);
   assert.equal(getElevation(tiles, lon, lat, 6), 100);
+  assert.deepEqual(sampleElevation(tiles, lon, lat, 6), { elevation: 100, tileAvailable: true });
+  assert.deepEqual(sampleElevation(new Map(), lon, lat, 6), { elevation: null, tileAvailable: false });
+  rgba[offset] = 128;
+  rgba[offset + 1] = 0;
+  rgba[offset + 2] = 0;
+  assert.equal(getElevation(tiles, lon, lat, 6), null);
+  assert.deepEqual(sampleElevation(tiles, lon, lat, 6), { elevation: null, tileAvailable: true });
   assert.equal(getElevation(new Map(), lon, lat, 6), null);
 });
