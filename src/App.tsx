@@ -1,6 +1,6 @@
 
 import { useCallback, useState } from 'react';
-import TerrainScene, { type PickedPoint } from './components/TerrainScene';
+import TerrainScene, { type PickedPoint, type ViewMode } from './components/TerrainScene';
 import { DEM_ZOOM, tileRange, JAPAN_BOUNDS } from './lib/terrain';
 
 const TILE_COUNT = tileRange(JAPAN_BOUNDS, DEM_ZOOM).length;
@@ -8,7 +8,8 @@ const coordinate = (value: number, positive: string, negative: string) =>
   Math.abs(value).toFixed(4) + '° ' + (value >= 0 ? positive : negative);
 
 export default function App() {
-  const [exaggeration, setExaggeration] = useState(12);
+  const [exaggeration, setExaggeration] = useState(1);
+  const [viewRequest, setViewRequest] = useState<{ mode: ViewMode } | null>(null);
   const [progress, setProgress] = useState(0);
   const [terrainFailed, setTerrainFailed] = useState(0);
   const [ready, setReady] = useState(false);
@@ -38,6 +39,7 @@ export default function App() {
           <div className="stage-glow" aria-hidden="true" />
           <TerrainScene
             exaggeration={exaggeration}
+            viewRequest={viewRequest}
             onProgress={handleProgress}
             onReady={handleReady}
             onError={handleError}
@@ -63,19 +65,25 @@ export default function App() {
         <aside className="control-panel" aria-label="地形表示の設定">
           <div className="panel-intro">
             <span className="eyebrow">JAPAN / ELEVATION MODEL</span>
-            <h1>日本列島の地形を、<br /><em>立体で見る。</em></h1>
             <p>実際の標高タイルから生成した地形を、自由な角度で探索できます。</p>
           </div>
           <section className="panel-section">
-            <div className="section-head"><h2>標高の強調</h2><span>01 / EXAGGERATION</span></div>
+            <div className="section-head"><h2>視点操作</h2><span>01 / CAMERA</span></div>
+            <div className="view-buttons">
+              <button type="button" onClick={() => setViewRequest({ mode: 'reset' })} disabled={!ready}>視点をリセット</button>
+              <button type="button" onClick={() => setViewRequest({ mode: 'top' })} disabled={!ready}>上面視</button>
+            </div>
+          </section>
+          <section className="panel-section">
+            <div className="section-head"><h2>標高の強調</h2><span>02 / EXAGGERATION</span></div>
             <div className="slider-value"><strong>{exaggeration}<small>×</small></strong><span>高さを見やすく強調</span></div>
-            <input aria-label="標高の強調倍率" type="range" min="1" max="25" step="1"
+            <input aria-label="標高の強調倍率" type="range" min="0" max="10" step="1"
               value={exaggeration} onChange={e => setExaggeration(Number(e.currentTarget.value))} />
-            <div className="range-labels"><span>1×</span><span>25×</span></div>
-            <p className="control-description">平面距離に対する高さの表示倍率です。取得した標高の値そのものは変化しません。</p>
+            <div className="range-labels"><span>0× (フラット)</span><span>10×</span></div>
+            <p className="control-description">0×で起伏のない平面、1×で等倍表示です。クリック地点の実際の標高値は変化しません。</p>
           </section>
           <section className="panel-section point-panel">
-            <div className="section-head"><h2>地点の標高</h2><span>02 / INSPECT</span></div>
+            <div className="section-head"><h2>地点の標高</h2><span>03 / INSPECT</span></div>
             {picked ? (
               <div className="picked-info">
                 <div className="picked-height"><strong>{picked.elevation.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}</strong><span>m</span></div>
@@ -97,10 +105,13 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>JAPAN GEOMETRY</span>
-        <span className="footer-credits">
-          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">標高データ：国土地理院</a>
-          <span>·</span><span>RENDERED WITH THREE.JS</span>
+        <span className="footer-copyright">© 2026 naoiw</span>
+        <span className="footer-links">
+          <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">標高データ：国土地理院 ↗</a>
+          <span className="footer-separator" aria-hidden="true">·</span>
+          <span>3D: THREE.JS</span>
+          <span className="footer-separator" aria-hidden="true">·</span>
+          <a href="https://github.com/naoiw/japan-geometry" target="_blank" rel="noopener noreferrer" aria-label="GitHubでソースコードを開く">GitHub ↗</a>
         </span>
       </footer>
     </div>

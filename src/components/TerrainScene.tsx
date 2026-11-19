@@ -7,11 +7,14 @@ import {
   normalizedToLonLat, terrainSize, type HeightTiles,
 } from '../lib/terrain';
 import { loadHeightTiles } from '../lib/tiles';
+import { flattenTerrainGeometry } from '../lib/terrainGeometry';
 
 export type PickedPoint = { longitude: number; latitude: number; elevation: number };
+export type ViewMode = 'reset' | 'top';
 
 type Props = {
   exaggeration: number;
+  viewRequest: { mode: ViewMode } | null;
   onProgress: (loaded: number, total: number) => void;
   onReady: (failed: number) => void;
   onError: (message: string) => void;
@@ -89,7 +92,7 @@ function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {
 }
 
 export default function TerrainScene({
-  exaggeration, onProgress, onReady, onError, onPick,
+  exaggeration, viewRequest, onProgress, onReady, onError, onPick,
 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const canvasState = useRef<{
@@ -101,6 +104,8 @@ export default function TerrainScene({
     elevationMaterial: THREE.MeshStandardMaterial;
   } | null>(null);
   const tilesRef = useRef<HeightTiles | null>(null);
+  const originalGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const flatGeometryRef = useRef<THREE.BufferGeometry | null>(null);
   const [terrainReady, setTerrainReady] = useState(false);
   const latestHandlers = useRef({ onProgress, onReady, onError, onPick });
   latestHandlers.current = { onProgress, onReady, onError, onPick };
@@ -130,10 +135,12 @@ export default function TerrainScene({
     controls.enablePan = true;
     controls.minDistance = 4;
     controls.maxDistance = 85;
-    controls.minPolarAngle = 0.17;
+    controls.minPolarAngle = 0; // Allow a true overhead view.
     controls.maxPolarAngle = Math.PI * 0.49;
     controls.target.set(0, 0, 0);
     camera.position.set(8, 22, 29);
+    controls.update();
+    controls.saveState();
 
     const light = new THREE.DirectionalLight('#fff2dc', 2.45);
     light.position.set(-9, 17, -12);
@@ -205,7 +212,10 @@ export default function TerrainScene({
       .then(({ tiles, errors }) => {
         if (controller.signal.aborted) return;
         tilesRef.current = tiles;
-        const mesh = new THREE.Mesh(buildGeometry(tiles), elevationMaterial);
+        const geometry = buildGeometry(tiles);
+        originalGeometryRef.current = geometry;
+        const mesh = new THREE.Mesh(geometry, elevationMaterial);
+        // The initial value is 1x. Later changes are applied in the effect below.
         mesh.scale.y = exaggeration;
         scene.add(mesh);
         if (canvasState.current) canvasState.current.mesh = mesh;
@@ -224,7 +234,10 @@ export default function TerrainScene({
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
       controls.dispose();
       const mesh = canvasState.current?.mesh;
-      mesh?.geometry.dispose();
+      originalGeometryRef.current?.dispose();
+      flatGeometryRef.current?.dispose();
+      originalGeometryRef.current = null;
+      flatGeometryRef.current = null;
       elevationMaterial.dispose();
       ocean.geometry.dispose();
       oceanMaterial.dispose();
@@ -241,9 +254,37 @@ export default function TerrainScene({
 
   useEffect(() => {
     const mesh = canvasState.current?.mesh;
-    if (mesh) mesh.scale.y = exaggeration;
+    const original = originalGeometryRef.current;
+    if (!mesh || !original) return;
+
+    if (exaggeration === 0) {
+      // scale.y = 0 makes the object matrix non-invertible and breaks raycasting.
+      // Use a genuinely flat geometry instead, preserving UVs for point inspection.
+      if (!flatGeometryRef.current) {
+        flatGeometryRef.current = flattenTerrainGeometry(original);
+      }
+      mesh.geometry = flatGeometryRef.current;
+      mesh.scale.y = 1;
+    } else {
+      mesh.geometry = original;
+      mesh.scale.y = exaggeration;
+    }
   }, [exaggeration, terrainReady]);
 
+  useEffect(() => {
+    const state = canvasState.current;
+    if (!state || !viewRequest) return;
+
+    // Clear any pending damped rotation/pan before moving the camera.
+    // reset() restores the original saved perspective and target.
+    state.controls.reset();
+    if (viewRequest.mode === 'top') {
+      // Look straight down with north (-Z) at the top of the screen.
+      // A tiny +Z offset avoids a degenerate up vector at exact zenith.
+      state.camera.position.set(0, 39, 0.001);
+      state.controls.update();
+    }
+  }, [viewRequest]);
 
   return <div ref={mount} className="terrain-canvas" aria-label="ドラッグして回転、ホイールやピンチで拡大縮小する日本列島の3D地形" role="img" />;
 }
