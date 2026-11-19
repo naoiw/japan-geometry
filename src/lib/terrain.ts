@@ -1,8 +1,10 @@
 
 /** Geographical coordinates, GSI DEM decoding and tile sampling (no browser dependencies). */
 export const JAPAN_BOUNDS = { west: 122, east: 154, north: 47, south: 20 } as const;
-export const DEM_ZOOM = 6;
-export const MAP_ZOOM = 5;
+export const DEM_ZOOM = 7;
+export const MAP_ZOOM = 6;
+/** Horizontal mesh subdivision count; shared by both dimensions. */
+export const MESH_SEGMENTS = 320;
 export const MODEL_WIDTH = 20;
 export const HEIGHT_UNITS_PER_METRE = 0.00006;
 

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  JAPAN_BOUNDS, DEM_ZOOM, MAP_ZOOM, HEIGHT_UNITS_PER_METRE, getElevation,
+  JAPAN_BOUNDS, DEM_ZOOM, MAP_ZOOM, MESH_SEGMENTS, HEIGHT_UNITS_PER_METRE, getElevation,
   lonLatToNormalized, normalizedToLonLat, pointOnTerrain, terrainSize, type HeightTiles,
 } from '../lib/terrain';
 import { loadHeightTiles, loadMapCanvas, type MapLayer } from '../lib/tiles';
@@ -22,23 +22,31 @@ type Props = {
   onPick: (point: PickedPoint) => void;
 };
 
-const COLUMN_COUNT = 208;
-const ROW_COUNT = 208;
+const COLUMN_COUNT = MESH_SEGMENTS;
+const ROW_COUNT = MESH_SEGMENTS;
+
+const COLOR_STOPS: readonly (readonly [number, THREE.Color])[] = [
+  [0, new THREE.Color('#3b8c76')],
+  [200, new THREE.Color('#72a37a')],
+  [550, new THREE.Color('#a0a47d')],
+  [1100, new THREE.Color('#c0a078')],
+  [1900, new THREE.Color('#a48677')],
+  [2800, new THREE.Color('#d3c5ac')],
+  [3900, new THREE.Color('#f1ede0')],
+];
+const MISSING_COLOR = new THREE.Color('#203241');
+const OCEAN_COLOR = new THREE.Color('#16465a');
 
 function colorForElevation(elevation: number | null): THREE.Color {
-  if (elevation === null) return new THREE.Color('#203241');
-  if (elevation <= 0) return new THREE.Color('#16465a');
-  const stops: [number, string][] = [
-    [0, '#3b8c76'], [200, '#72a37a'], [550, '#a0a47d'],
-    [1100, '#c0a078'], [1900, '#a48677'], [2800, '#d3c5ac'], [3900, '#f1ede0'],
-  ];
-  for (let i = 1; i < stops.length; i++) {
-    if (elevation <= stops[i][0]) {
-      const t = (elevation - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
-      return new THREE.Color(stops[i - 1][1]).lerp(new THREE.Color(stops[i][1]), t);
+  if (elevation === null) return MISSING_COLOR;
+  if (elevation <= 0) return OCEAN_COLOR;
+  for (let i = 1; i < COLOR_STOPS.length; i++) {
+    if (elevation <= COLOR_STOPS[i][0]) {
+      const t = (elevation - COLOR_STOPS[i - 1][0]) / (COLOR_STOPS[i][0] - COLOR_STOPS[i - 1][0]);
+      return COLOR_STOPS[i - 1][1].clone().lerp(COLOR_STOPS[i][1], t);
     }
   }
-  return new THREE.Color('#f1ede0');
+  return COLOR_STOPS[COLOR_STOPS.length - 1][1];
 }
 
 function buildGeometry(tiles: HeightTiles): THREE.BufferGeometry {

@@ -59,7 +59,7 @@ export async function loadHeightTiles(
   const tiles: HeightTiles = new Map();
   let loaded = 0;
   let errors = 0;
-  await concurrent(coords, 7, async (coord) => {
+  await concurrent(coords, 6, async (coord) => {
     if (signal.aborted) return;
     try {
       const image = await imageFromUrl(demUrl(coord));
@@ -89,8 +89,8 @@ export async function loadMapCanvas(
   bounds: Bounds = JAPAN_BOUNDS,
 ): Promise<{ canvas: HTMLCanvasElement; missing: number }> {
   const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
+  canvas.width = 2048;
+  canvas.height = 2048;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2Dが利用できません');
   ctx.fillStyle = '#142839';
@@ -104,9 +104,14 @@ export async function loadMapCanvas(
   const yEnd = (1 - Math.asinh(Math.tan(southernRad)) / Math.PI) / 2 * 2 ** zoom;
 
   // Draw asynchronously loaded tiles in a fixed tile order: no canvas race on overlap.
-  const results = await Promise.all(coords.map(async (coord) => {
-    try { return await imageFromUrl(mapTileUrl(coord, layer)); } catch { return null; }
-  }));
+  const results: (HTMLImageElement | null)[] = new Array(coords.length).fill(null);
+  await concurrent(coords.map((coord, index) => ({ coord, index })), 6, async ({ coord, index }) => {
+    try {
+      results[index] = await imageFromUrl(mapTileUrl(coord, layer));
+    } catch {
+      // Keep missing tiles blank, and display the missing count to the user.
+    }
+  });
   let missing = 0;
   results.forEach((image, i) => {
     if (!image) { missing++; return; }
